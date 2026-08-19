@@ -1,0 +1,44 @@
+name: Self Hosted Runner Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-runner:
+    runs-on: self-hosted
+
+    steps:
+      - name: Show runner information
+        shell: powershell
+        run: |
+          Write-Host "===== RUNNER INFORMATION ====="
+          Write-Host "Computer: $env:COMPUTERNAME"
+          Write-Host "User: $env:USERNAME"
+          Write-Host "OS:"
+          Get-CimInstance Win32_OperatingSystem | Select-Object Caption, Version
+
+      - name: Check Docker
+        shell: powershell
+        run: |
+          Write-Host "===== DOCKER VERSION ====="
+          docker --version
+
+      - name: Check Docker Compose
+        shell: powershell
+        run: |
+          Write-Host "===== DOCKER COMPOSE VERSION ====="
+          docker compose version
+
+      - name: Check project folder
+        shell: powershell
+        run: |
+          Write-Host "===== PROJECT FOLDER ====="
+
+          if (Test-Path "D:\ITE\Year_4\Devops\week_2\devops-task-api") {
+              Write-Host "Project folder exists."
+              Get-ChildItem "D:\ITE\Year_4\Devops\week_2\devops-task-api"
+          }
+          else {
+              Write-Host "Project folder NOT found."
+              exit 1
+          }
