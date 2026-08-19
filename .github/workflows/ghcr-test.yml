@@ -1,0 +1,36 @@
+name: GHCR Test
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  test-ghcr:
+    runs-on: self-hosted
+
+    steps:
+      - name: Login to GHCR
+        shell: powershell
+        run: |
+          $env:GITHUB_TOKEN | docker login ghcr.io -u $env:GITHUB_ACTOR --password-stdin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+
+      - name: Pull Docker image
+        shell: powershell
+        run: |
+          docker pull ghcr.io/sopheaklaing/devops-task-api:1.0
+
+      - name: Check image
+        shell: powershell
+        run: |
+          docker images ghcr.io/sopheaklaing/devops-task-api
+
+      - name: Docker logout
+        shell: powershell
+        run: |
+          docker logout ghcr.io
