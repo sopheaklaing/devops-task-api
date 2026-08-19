@@ -1,0 +1,65 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Login to GHCR
+        shell: powershell
+        run: |
+          $env:GITHUB_TOKEN | docker login ghcr.io -u $env:GITHUB_ACTOR --password-stdin
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
+
+      - name: Pull production image
+        shell: powershell
+        run: |
+          docker pull ghcr.io/sopheaklaing/devops-task-api:1.0
+
+      - name: Deploy production
+        shell: powershell
+        run: |
+          docker compose -f compose.prod.yaml up -d
+
+      - name: Check production containers
+        shell: powershell
+        run: |
+          docker compose -f compose.prod.yaml ps
+
+      - name: Check Laravel application
+        shell: powershell
+        run: |
+          try {
+              $response = Invoke-WebRequest `
+                -Uri "http://localhost:8002" `
+                -UseBasicParsing
+
+              Write-Host "Laravel HTTP Status: $($response.StatusCode)"
+
+              if ($response.StatusCode -ne 200) {
+                  exit 1
+              }
+          }
+          catch {
+              Write-Host "Laravel application is not responding."
+              Write-Host $_
+              exit 1
+          }
+
+      - name: Logout from GHCR
+        shell: powershell
+        run: |
+          docker logout ghcr.io
+          
