@@ -113,5 +113,5 @@ jobs:
           context: .
           push: true
           tags: |
-            ghcr.io/sopheaklaing/devops-task-api:latest
+            ghcr.io/sopheaklaing/devops-task-api:1.0.0
             ghcr.io/sopheaklaing/devops-task-api:${{ github.sha }}
