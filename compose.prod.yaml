@@ -16,6 +16,7 @@ services:
     environment:
       APP_ENV: production
       APP_DEBUG: "false"
+      APP_KEY: "base64:CeEU3IhLEmu6rz9f/ccqkHsGRJjGX5BOjEJw62y6o7I="
 
       DB_CONNECTION: pgsql
       DB_HOST: postgres
