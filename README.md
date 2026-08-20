@@ -1,58 +1,278 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# DevOps Task API
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A Laravel API project using Docker, PostgreSQL, Redis, and a GitHub Actions CI/CD Pipeline (Self-Hosted Runner).
 
-## About Laravel
+## 📋 Table of Contents
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Prerequisites](#prerequisites)
+- [Setup](#setup)
+- [Development Workflow](#development-workflow)
+- [Testing](#testing)
+- [Git Workflow](#git-workflow)
+- [CI/CD Pipeline](#cicd-pipeline)
+- [Production Deployment](#production-deployment)
+- [Manual Pre-Deploy (Local Build & Push)](#manual-pre-deploy-local-build--push)
+- [Ports](#ports)
+- [Quick Commands](#quick-commands)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Overview
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+This project follows the flow below whenever code is updated:
 
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
-
-```bash
-composer require laravel/boost --dev
-
-php artisan boost:install
+```
+Edit Code → Test Locally → Git Add → Git Commit → Git Push
+   → GitHub Actions CI → Test → Build Docker Image
+   → Push to GHCR → Deploy Production
+   → Run Docker Containers → Health Check → Production ✅
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+## Architecture
 
-## Contributing
+```
+                 DEVELOPMENT
+                      │
+                 Write Code
+                      ↓
+              Local Docker Test
+                      ↓
+        git add . → git commit → git push
+                      ↓
+                    GITHUB
+                      ↓
+              GitHub Actions
+                      ↓
+                   CI TEST
+                ┌─────┴─────┐
+              FAIL         PASS
+                │           ↓
+                ❌     Docker Build
+                            ↓
+                           GHCR
+                            ↓
+                   Production Deploy
+                   (Self-Hosted Runner)
+                            ↓
+                      Docker Pull
+                            ↓
+                   docker compose up
+                            ↓
+                    Health Check
+                            ↓
+                       ✅ LIVE
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Prerequisites
 
-## Code of Conduct
+- Docker Desktop (Windows)
+- GitHub Self-Hosted Runner (`C:\actions-runner`)
+- Git
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+## Setup
 
-## Security Vulnerabilities
+### 1. Start Docker Desktop
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Open Docker Desktop before doing anything else, then check which containers are currently running:
 
-## License
+```powershell
+docker ps
+```
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### 2. Start the GitHub Self-Hosted Runner
+
+Open a separate PowerShell window and leave it running:
+
+```powershell
+cd C:\actions-runner
+.\run.cmd
+```
+
+Wait until you see:
+
+```
+Connected to GitHub
+Current runner version: '2.336.0'
+Listening for Jobs
+```
+
+### 3. Open the Project
+
+```powershell
+cd D:\ITE\Year_4\Devops\week_2\devops-task-api
+```
+
+### 4. Start the Development Environment
+
+```powershell
+docker compose up -d
+docker compose ps
+```
+
+You should see these containers running: `devops-task-api`, `devops-postgres`, `devops-redis`
+
+## Development Workflow
+
+Edit the Laravel code within a structure such as:
+
+```
+app/
+├── Http/Controllers/TaskController.php
+├── Models/Task.php
+routes/api.php
+```
+
+Example endpoints:
+
+```
+GET    /api/tasks
+POST   /api/tasks
+PUT    /api/tasks/{id}
+DELETE /api/tasks/{id}
+```
+
+## Testing
+
+Before pushing, always test locally first:
+
+```powershell
+docker compose exec app php artisan test
+```
+
+- `PASS` → ✅ Code is OK
+- `FAIL` → Fix the issue before pushing
+
+## Git Workflow
+
+```powershell
+git status
+git add .
+git commit -m "feat: add task filtering"
+git push origin develop
+```
+
+## CI/CD Pipeline
+
+When you push to `develop`, GitHub Actions (`.github/workflows/ci.yml`) runs:
+
+```
+Checkout Code → Setup PHP 8.4 → Start PostgreSQL → Start Redis
+   → Composer Install → Laravel Migration → Laravel Tests
+```
+
+If all tests pass → it proceeds to build the Docker image → push it to GHCR (`ghcr.io/sopheaklaing/devops-task-api`).
+
+## Production Deployment
+
+`deploy.yml` uses `runs-on: self-hosted` to run directly on your Windows PC:
+
+```powershell
+docker login ghcr.io
+docker pull ghcr.io/sopheaklaing/devops-task-api:1.0
+docker compose -f compose.prod.yaml up -d
+docker compose -f compose.prod.yaml ps
+```
+
+### Health Check
+
+The workflow checks `http://localhost:8002` using `Invoke-WebRequest` — a `200 OK` response means the deployment succeeded.
+
+## Ports
+
+| Service     | Local Port |
+|-------------|-----------|
+| Laravel API | 8002      |
+| PostgreSQL  | 5434      |
+| Redis       | 6380      |
+
+## Manual Pre-Deploy (Local Build & Push)
+
+If you want to build and push the image manually before deploying (bypassing CI):
+
+### 1. Start the Self-Hosted Runner
+
+```powershell
+cd C:\actions-runner
+.\run.cmd
+```
+
+Keep this window open.
+
+### 2. Build the Docker Image
+
+```powershell
+docker build -t devops-task-api:1.0.0 .
+```
+
+⚠️ Don't forget the `.` at the end of the command (build context path) — without it, Docker will error out.
+
+### 3. Tag the Image for GHCR
+
+```powershell
+docker tag devops-task-api:1.0.0 ghcr.io/sopheaklaing/devops-task-api:1.0.0
+```
+
+### 4. Login (if not already logged in)
+
+```powershell
+docker login ghcr.io
+```
+
+### 5. Push to GHCR
+
+```powershell
+docker push ghcr.io/sopheaklaing/devops-task-api:1.0.0
+```
+
+### 6. Pull the Image on Production
+
+```powershell
+docker compose -f compose.prod.yaml pull
+```
+
+### 7. Start Production Containers
+
+```powershell
+docker compose -f compose.prod.yaml up -d
+```
+
+### 8. Verify Containers Are Running
+
+```powershell
+docker compose -f compose.prod.yaml ps
+```
+
+You should see `devops-task-api-prod`, `devops-postgres-prod`, and `devops-redis-prod` all showing `Up`.
+
+**Flow:**
+
+```
+Runner ready → Build image → Tag for GHCR → Push to GHCR
+   → Pull on prod → Start containers → Verify status ✅
+```
+
+## Quick Commands
+
+Whenever you want to update code, just follow these steps:
+
+```powershell
+# 1. Start development
+docker compose up -d
+
+# 2. Test
+docker compose exec app php artisan test
+
+# 3. Check Git status
+git status
+
+# 4. Stage changes
+git add .
+
+# 5. Commit
+git commit -m "feat: your change"
+
+# 6. Push
+git push origin develop
+```
+
+After that, GitHub Actions will automatically continue: CI Test → Docker Build → GHCR → Deploy Production.
