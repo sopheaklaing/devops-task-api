@@ -269,7 +269,7 @@ git status
 git add .
 
 # 5. Commit
-git commit -m "feat: your change"
+git commit -m "feat: your fix"
 
 # 6. Push
 git push origin develop
