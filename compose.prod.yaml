@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/sopheaklaing/devops-task-api:1.0
+    image: ghcr.io/sopheaklaing/devops-task-api:1.0.0
 
     container_name: devops-task-api-prod
 
