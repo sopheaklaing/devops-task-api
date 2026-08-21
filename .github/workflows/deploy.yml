@@ -47,7 +47,7 @@ jobs:
         shell: powershell
         run: |
           $response = Invoke-WebRequest `
-            -Uri "http://localhost:8002" `
+            -Uri "http://localhost:8002/task" `
             -UseBasicParsing
 
           Write-Host "Laravel HTTP Status: $($response.StatusCode)"
