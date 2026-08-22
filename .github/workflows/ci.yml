@@ -17,7 +17,9 @@ permissions:
   packages: write
 
 jobs:
+  # 1. TEST
   test:
+    name:  Test
     runs-on: ubuntu-latest
 
     services:
@@ -89,9 +91,81 @@ jobs:
           REDIS_PORT: 6379
 
         run: php artisan test
-
-  build-and-push:
+  # 2. LINT
+  lint:
+    name:  Lint
     needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Run Laravel Pint
+        run: vendor/bin/pint --test
+  # 3. COVERAGE
+  coverage:
+    name:  Coverage
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: pdo, pdo_pgsql
+          coverage: xdebug
+
+      - name: Copy environment file
+        run: cp .env.example .env
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist
+
+      - name: Generate application key
+        run: php artisan key:generate
+
+      - name: Run migrations
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: devops_task_test
+          DB_USERNAME: postgres
+          DB_PASSWORD: secret
+
+        run: php artisan migrate --force
+
+      - name: Run tests with coverage
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: devops_task_test
+          DB_USERNAME: postgres
+          DB_PASSWORD: secret
+
+        run: php artisan test --coverage
+  # 4. DOCKER BUILD & PUSH
+  build-and-push:
+    name:  Docker Build & Push
+    needs:
+      - test
+      - lint
+      - coverage
+
     runs-on: ubuntu-latest
 
     steps:
@@ -110,11 +184,55 @@ jobs:
         with:
           context: .
           push: true
-          tags: ghcr.io/sopheaklaing/devops-task-api:${{ github.sha }}
+          tags: |
+            ghcr.io/sopheaklaing/devops-task-api:${{ github.sha }}
+            ghcr.io/sopheaklaing/devops-task-api:latest
 
       - name: Tag production image
         if: github.ref == 'refs/heads/main'
         run: |
           docker pull ghcr.io/sopheaklaing/devops-task-api:${{ github.sha }}
-          docker tag ghcr.io/sopheaklaing/devops-task-api:${{ github.sha }} ghcr.io/sopheaklaing/devops-task-api:1.0.0
+
+          docker tag \
+            ghcr.io/sopheaklaing/devops-task-api:${{ github.sha }} \
+            ghcr.io/sopheaklaing/devops-task-api:1.0.0
+
           docker push ghcr.io/sopheaklaing/devops-task-api:1.0.0
+  # 5. QUALITY GATE
+  quality-gate:
+    name:  Quality Gate
+    needs:
+      - test
+      - lint
+      - coverage
+      - build-and-push
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Quality Gate Passed
+        run: |
+          echo " TEST PASSED"
+          echo " LINT PASSED"
+          echo " COVERAGE PASSED"
+          echo " DOCKER BUILD PASSED"
+          echo " QUALITY GATE PASSED"
+  # 6. IMAGE INFORMATION
+  image-info:
+    name:  Docker Image
+    needs: quality-gate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Show Docker Image
+        run: |
+          echo "Docker Image:"
+          echo "ghcr.io/sopheaklaing/devops-task-api:${{ github.sha }}"
+
+          echo ""
+          echo "GHCR Package:"
+          echo "https://github.com/sopheaklaing/devops-task-api/pkgs/container/devops-task-api"
+
+          echo ""
+          echo "Production Image:"
+          echo "ghcr.io/sopheaklaing/devops-task-api:1.0.0"
