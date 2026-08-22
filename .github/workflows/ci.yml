@@ -12,9 +12,9 @@ on:
       - main
       - develop
 
+# Default permissions for all jobs
 permissions:
   contents: read
-  packages: write
 
 jobs:
   # ============================================================
@@ -125,32 +125,12 @@ jobs:
         run: php artisan test
 
   # ============================================================
-  # 2. PARALLEL CHECKS (LINT & COVERAGE VIA MATRIX)
+  # 2. LINT
   # ============================================================
-  checks:
-    name: Check (${{ matrix.task }})
+  lint:
+    name: Check (Lint)
     needs: test
     runs-on: ubuntu-latest
-
-    strategy:
-      fail-fast: false
-      matrix:
-        task: [lint, coverage]
-
-    services:
-      postgres:
-        image: postgres:17
-        env:
-          POSTGRES_DB: devops_task_test
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: secret
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd="pg_isready -U postgres -d devops_task_test"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
 
     steps:
       - name: Checkout repository
@@ -160,8 +140,56 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: "8.4"
+          coverage: none
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Run Laravel Pint
+        run: vendor/bin/pint --test
+
+  # ============================================================
+  # 3. COVERAGE
+  # ============================================================
+  coverage:
+    name: Check (Coverage)
+    needs: test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+
+        env:
+          POSTGRES_DB: devops_task_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: secret
+
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd="pg_isready -U postgres -d devops_task_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
+      redis:
+        image: redis:7-alpine
+
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP with Xdebug
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
           extensions: pdo, pdo_pgsql
-          coverage: ${{ matrix.task == 'coverage' && 'xdebug' || 'none' }}
+          coverage: xdebug
 
       - name: Copy environment file
         run: cp .env.example .env
@@ -169,18 +197,10 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-      # --- LINT TASK ---
-      - name: Run Laravel Pint (Lint)
-        if: matrix.task == 'lint'
-        run: vendor/bin/pint --test
-
-      # --- COVERAGE TASK ---
       - name: Generate application key
-        if: matrix.task == 'coverage'
         run: php artisan key:generate
 
       - name: Check PostgreSQL connection
-        if: matrix.task == 'coverage'
         env:
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
@@ -213,7 +233,6 @@ jobs:
           '
 
       - name: Run migrations
-        if: matrix.task == 'coverage'
         env:
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
@@ -221,10 +240,11 @@ jobs:
           DB_DATABASE: devops_task_test
           DB_USERNAME: postgres
           DB_PASSWORD: secret
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
         run: php artisan migrate --force
 
       - name: Run tests with coverage
-        if: matrix.task == 'coverage'
         env:
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
@@ -232,18 +252,26 @@ jobs:
           DB_DATABASE: devops_task_test
           DB_USERNAME: postgres
           DB_PASSWORD: secret
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
         run: php artisan test --coverage
 
   # ============================================================
-  # 3. DOCKER BUILD & PUSH
+  # 4. DOCKER BUILD & PUSH
   # ============================================================
   build-and-push:
     name: Docker Build & Push
+
     needs:
       - test
-      - checks
+      - lint
+      - coverage
 
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       - name: Checkout repository
@@ -265,6 +293,7 @@ jobs:
             ghcr.io/sopheaklaing/devops-task-api:${{ github.sha }}
             ghcr.io/sopheaklaing/devops-task-api:latest
 
+      # Production tag only from main
       - name: Tag production image
         if: github.ref == 'refs/heads/main'
         run: |
@@ -277,13 +306,15 @@ jobs:
           docker push ghcr.io/sopheaklaing/devops-task-api:1.0.0
 
   # ============================================================
-  # 4. QUALITY GATE
+  # 5. QUALITY GATE
   # ============================================================
   quality-gate:
     name: Quality Gate
+
     needs:
       - test
-      - checks
+      - lint
+      - coverage
       - build-and-push
 
     runs-on: ubuntu-latest
@@ -291,30 +322,52 @@ jobs:
     steps:
       - name: Quality Gate Passed
         run: |
-          echo "TEST PASSED"
-          echo "LINT PASSED"
-          echo "COVERAGE PASSED"
-          echo "DOCKER BUILD PASSED"
-          echo "QUALITY GATE PASSED"
+          echo "======================================"
+          echo "         QUALITY GATE PASSED"
+          echo "======================================"
+          echo ""
+          echo "TEST       : PASSED"
+          echo "LINT       : PASSED"
+          echo "COVERAGE   : PASSED"
+          echo "DOCKER     : PASSED"
+          echo ""
+          echo "All CI checks passed successfully!"
+          echo "======================================"
 
   # ============================================================
-  # 5. IMAGE INFORMATION
+  # 6. IMAGE INFORMATION
   # ============================================================
   image-info:
     name: Docker Image
+
     needs: quality-gate
+
     runs-on: ubuntu-latest
 
     steps:
       - name: Show Docker Image
         run: |
-          echo "Docker Image:"
+          echo "======================================"
+          echo "           DOCKER IMAGE"
+          echo "======================================"
+          echo ""
+          echo "Image:"
           echo "ghcr.io/sopheaklaing/devops-task-api:${{ github.sha }}"
-
+          echo ""
+          echo "Latest:"
+          echo "ghcr.io/sopheaklaing/devops-task-api:latest"
           echo ""
           echo "GHCR Package:"
           echo "https://github.com/sopheaklaing/devops-task-api/pkgs/container/devops-task-api"
+          echo ""
+
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "Production:"
+            echo "ghcr.io/sopheaklaing/devops-task-api:1.0.0"
+          else
+            echo "Production:"
+            echo "Not created (main branch only)"
+          fi
 
           echo ""
-          echo "Production Image:"
-          echo "ghcr.io/sopheaklaing/devops-task-api:1.0.0"
+          echo "======================================"
