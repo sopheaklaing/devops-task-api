@@ -1,17 +1,19 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use App\Models\Task;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class TaskController extends Controller
 {
-    public function index(): JsonResponse{
+    public function index(): JsonResponse
+    {
         return response()->json(Task::all());
     }
 
-   public function store(Request $request)
+    public function store(Request $request)
     {
         $task = Task::create([
             'title' => $request->title,
@@ -21,7 +23,8 @@ class TaskController extends Controller
         return response()->json($task, 201);
     }
 
-    public function  show(Task $task){
+    public function show(Task $task)
+    {
 
         return response()->json($task);
     }
@@ -37,9 +40,9 @@ class TaskController extends Controller
     }
 
     public function destroy(Task $task)
-{
-    $task->delete();
+    {
+        $task->delete();
 
-    return response()->noContent();
-}
+        return response()->noContent();
+    }
 }

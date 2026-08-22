@@ -1,10 +1,12 @@
 <?php
-use Illuminate\Support\Facades\Route;
+
 use App\Http\Controllers\TaskController;
+use Illuminate\Support\Facades\Route;
+
 Route::get('/test', function () {
     return response()->json([
         'message' => 'Docker Laravel API is working!',
-        'status' => 'success'
+        'status' => 'success',
     ]);
 });
 Route::get('/tasks', [TaskController::class, 'index']);
