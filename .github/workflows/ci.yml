@@ -92,7 +92,7 @@ jobs:
 
         run: php artisan test
 
-  build-and-push:
+    build-and-push:
     needs: test
     runs-on: ubuntu-latest
 
@@ -107,11 +107,16 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Docker image
+      - name: Build and push image
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          tags: |
-            ghcr.io/sopheaklaing/devops-task-api:1.0.0
-            ghcr.io/sopheaklaing/devops-task-api:${{ github.sha }}
+          tags: ghcr.io/sopheaklaing/devops-task-api:${{ github.sha }}
+
+      - name: Tag production image
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker pull ghcr.io/sopheaklaing/devops-task-api:${{ github.sha }}
+          docker tag ghcr.io/sopheaklaing/devops-task-api:${{ github.sha }} ghcr.io/sopheaklaing/devops-task-api:1.0.0
+          docker push ghcr.io/sopheaklaing/devops-task-api:1.0.0
