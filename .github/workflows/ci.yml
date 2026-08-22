@@ -125,48 +125,27 @@ jobs:
         run: php artisan test
 
   # ============================================================
-  # 2. LINT
+  # 2. PARALLEL CHECKS (LINT & COVERAGE VIA MATRIX)
   # ============================================================
-  lint:
-    name: Lint
+  checks:
+    name: Check (${{ matrix.task }})
     needs: test
     runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: "8.4"
-
-      - name: Install Composer dependencies
-        run: composer install --no-interaction --prefer-dist --optimize-autoloader
-
-      - name: Run Laravel Pint
-        run: vendor/bin/pint --test
-
-  # ============================================================
-  # 3. COVERAGE
-  # ============================================================
-  coverage:
-    name: Coverage
-    needs: test
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        task: [lint, coverage]
 
     services:
       postgres:
         image: postgres:17
-
         env:
           POSTGRES_DB: devops_task_test
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: secret
-
         ports:
           - 5432:5432
-
         options: >-
           --health-cmd="pg_isready -U postgres -d devops_task_test"
           --health-interval=10s
@@ -182,7 +161,7 @@ jobs:
         with:
           php-version: "8.4"
           extensions: pdo, pdo_pgsql
-          coverage: xdebug
+          coverage: ${{ matrix.task == 'coverage' && 'xdebug' || 'none' }}
 
       - name: Copy environment file
         run: cp .env.example .env
@@ -190,10 +169,18 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
+      # --- LINT TASK ---
+      - name: Run Laravel Pint (Lint)
+        if: matrix.task == 'lint'
+        run: vendor/bin/pint --test
+
+      # --- COVERAGE TASK ---
       - name: Generate application key
+        if: matrix.task == 'coverage'
         run: php artisan key:generate
 
       - name: Check PostgreSQL connection
+        if: matrix.task == 'coverage'
         env:
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
@@ -226,6 +213,7 @@ jobs:
           '
 
       - name: Run migrations
+        if: matrix.task == 'coverage'
         env:
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
@@ -236,6 +224,7 @@ jobs:
         run: php artisan migrate --force
 
       - name: Run tests with coverage
+        if: matrix.task == 'coverage'
         env:
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
@@ -246,14 +235,13 @@ jobs:
         run: php artisan test --coverage
 
   # ============================================================
-  # 4. DOCKER BUILD & PUSH
+  # 3. DOCKER BUILD & PUSH
   # ============================================================
   build-and-push:
     name: Docker Build & Push
     needs:
       - test
-      - lint
-      - coverage
+      - checks
 
     runs-on: ubuntu-latest
 
@@ -289,14 +277,13 @@ jobs:
           docker push ghcr.io/sopheaklaing/devops-task-api:1.0.0
 
   # ============================================================
-  # 5. QUALITY GATE
+  # 4. QUALITY GATE
   # ============================================================
   quality-gate:
     name: Quality Gate
     needs:
       - test
-      - lint
-      - coverage
+      - checks
       - build-and-push
 
     runs-on: ubuntu-latest
@@ -311,7 +298,7 @@ jobs:
           echo "QUALITY GATE PASSED"
 
   # ============================================================
-  # 6. IMAGE INFORMATION
+  # 5. IMAGE INFORMATION
   # ============================================================
   image-info:
     name: Docker Image
