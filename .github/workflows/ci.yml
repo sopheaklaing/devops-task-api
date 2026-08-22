@@ -5,7 +5,7 @@ on:
     branches:
       - main
       - develop
-      - 'feature/**'
+      - "feature/**"
 
   pull_request:
     branches:
@@ -17,9 +17,11 @@ permissions:
   packages: write
 
 jobs:
+  # ============================================================
   # 1. TEST
+  # ============================================================
   test:
-    name:  Test
+    name: Test
     runs-on: ubuntu-latest
 
     services:
@@ -66,6 +68,38 @@ jobs:
       - name: Generate application key
         run: php artisan key:generate
 
+      - name: Check PostgreSQL connection
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: devops_task_test
+          DB_USERNAME: postgres
+          DB_PASSWORD: secret
+        run: |
+          php -r '
+          $maxAttempts = 30;
+
+          for ($i = 1; $i <= $maxAttempts; $i++) {
+              try {
+                  new PDO(
+                      "pgsql:host=127.0.0.1;port=5432;dbname=devops_task_test",
+                      "postgres",
+                      "secret"
+                  );
+
+                  echo "PostgreSQL is ready!" . PHP_EOL;
+                  exit(0);
+              } catch (PDOException $e) {
+                  echo "Waiting for PostgreSQL... ($i/$maxAttempts)" . PHP_EOL;
+                  sleep(2);
+              }
+          }
+
+          echo "PostgreSQL failed to become ready." . PHP_EOL;
+          exit(1);
+          '
+
       - name: Run migrations
         env:
           DB_CONNECTION: pgsql
@@ -76,7 +110,6 @@ jobs:
           DB_PASSWORD: secret
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
-
         run: php artisan migrate --force
 
       - name: Run tests
@@ -89,11 +122,13 @@ jobs:
           DB_PASSWORD: secret
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
-
         run: php artisan test
+
+  # ============================================================
   # 2. LINT
+  # ============================================================
   lint:
-    name:  Lint
+    name: Lint
     needs: test
     runs-on: ubuntu-latest
 
@@ -107,15 +142,36 @@ jobs:
           php-version: "8.4"
 
       - name: Install Composer dependencies
-        run: composer install --no-interaction --prefer-dist
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Run Laravel Pint
         run: vendor/bin/pint --test
+
+  # ============================================================
   # 3. COVERAGE
+  # ============================================================
   coverage:
-    name:  Coverage
+    name: Coverage
     needs: test
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:17
+
+        env:
+          POSTGRES_DB: devops_task_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: secret
+
+        ports:
+          - 5432:5432
+
+        options: >-
+          --health-cmd="pg_isready -U postgres -d devops_task_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
 
     steps:
       - name: Checkout repository
@@ -132,10 +188,42 @@ jobs:
         run: cp .env.example .env
 
       - name: Install Composer dependencies
-        run: composer install --no-interaction --prefer-dist
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
       - name: Generate application key
         run: php artisan key:generate
+
+      - name: Check PostgreSQL connection
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: devops_task_test
+          DB_USERNAME: postgres
+          DB_PASSWORD: secret
+        run: |
+          php -r '
+          $maxAttempts = 30;
+
+          for ($i = 1; $i <= $maxAttempts; $i++) {
+              try {
+                  new PDO(
+                      "pgsql:host=127.0.0.1;port=5432;dbname=devops_task_test",
+                      "postgres",
+                      "secret"
+                  );
+
+                  echo "PostgreSQL is ready!" . PHP_EOL;
+                  exit(0);
+              } catch (PDOException $e) {
+                  echo "Waiting for PostgreSQL... ($i/$maxAttempts)" . PHP_EOL;
+                  sleep(2);
+              }
+          }
+
+          echo "PostgreSQL failed to become ready." . PHP_EOL;
+          exit(1);
+          '
 
       - name: Run migrations
         env:
@@ -145,7 +233,6 @@ jobs:
           DB_DATABASE: devops_task_test
           DB_USERNAME: postgres
           DB_PASSWORD: secret
-
         run: php artisan migrate --force
 
       - name: Run tests with coverage
@@ -156,11 +243,13 @@ jobs:
           DB_DATABASE: devops_task_test
           DB_USERNAME: postgres
           DB_PASSWORD: secret
-
         run: php artisan test --coverage
+
+  # ============================================================
   # 4. DOCKER BUILD & PUSH
+  # ============================================================
   build-and-push:
-    name:  Docker Build & Push
+    name: Docker Build & Push
     needs:
       - test
       - lint
@@ -198,9 +287,12 @@ jobs:
             ghcr.io/sopheaklaing/devops-task-api:1.0.0
 
           docker push ghcr.io/sopheaklaing/devops-task-api:1.0.0
+
+  # ============================================================
   # 5. QUALITY GATE
+  # ============================================================
   quality-gate:
-    name:  Quality Gate
+    name: Quality Gate
     needs:
       - test
       - lint
@@ -212,14 +304,17 @@ jobs:
     steps:
       - name: Quality Gate Passed
         run: |
-          echo " TEST PASSED"
-          echo " LINT PASSED"
-          echo " COVERAGE PASSED"
-          echo " DOCKER BUILD PASSED"
-          echo " QUALITY GATE PASSED"
+          echo "TEST PASSED"
+          echo "LINT PASSED"
+          echo "COVERAGE PASSED"
+          echo "DOCKER BUILD PASSED"
+          echo "QUALITY GATE PASSED"
+
+  # ============================================================
   # 6. IMAGE INFORMATION
+  # ============================================================
   image-info:
-    name:  Docker Image
+    name: Docker Image
     needs: quality-gate
     runs-on: ubuntu-latest
 
