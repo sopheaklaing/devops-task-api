@@ -6,6 +6,7 @@ use App\Models\Task;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
+
 use Tests\TestCase;
 
 class TaskApiTest extends TestCase
@@ -81,10 +82,10 @@ class TaskApiTest extends TestCase
             'title' => 'Learn Docker',
             'description' => 'Learn Docker Compose and CI/CD',
         ]);
-
         $response = $this
             ->withHeaders($this->authHeaders())
             ->getJson('/api/tasks/'.$task->id);
+
 
         $response->assertStatus(200);
 
@@ -106,7 +107,6 @@ class TaskApiTest extends TestCase
             'title' => 'Learn Docker',
             'description' => 'Learn Docker Compose',
         ]);
-
         $response = $this
             ->withHeaders($this->authHeaders())
             ->putJson('/api/tasks/'.$task->id, [
@@ -140,7 +140,6 @@ class TaskApiTest extends TestCase
             ->deleteJson('/api/tasks/'.$task->id);
 
         $response->assertStatus(204);
-
         $this->assertDatabaseMissing('tasks', [
             'id' => $task->id,
         ]);

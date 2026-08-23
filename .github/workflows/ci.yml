@@ -12,9 +12,6 @@ on:
       - main
       - develop
 
-# ============================================================
-# DEFAULT PERMISSIONS
-# ============================================================
 
 permissions:
   contents: read
@@ -23,7 +20,6 @@ jobs:
   # ============================================================
   # 1. TEST
   # ============================================================
-
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -134,7 +130,7 @@ jobs:
       # Run Migrations
       # --------------------------------------------------------
 
-      - name: Run migrations
+      - name: Check PostgreSQL connection
         env:
           APP_KEY: ${{ secrets.CI_APP_KEY }}
           JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
@@ -144,13 +140,6 @@ jobs:
           DB_PORT: 5432
           DB_DATABASE: devops_task_test
           DB_USERNAME: postgres
-          DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
-
-          REDIS_CLIENT: phpredis
-          REDIS_HOST: 127.0.0.1
-          REDIS_PORT: 6379
-          REDIS_PASSWORD: ${{ secrets.CI_REDIS_PASSWORD }}
-
         run: php artisan migrate --force
 
       # --------------------------------------------------------
@@ -168,25 +157,26 @@ jobs:
           DB_PORT: 5432
           DB_DATABASE: devops_task_test
           DB_USERNAME: postgres
-          DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
 
-          REDIS_CLIENT: phpredis
+      - name: Run tests with coverage
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: devops_task_test
+          DB_USERNAME: postgres
+          DB_PASSWORD: secret
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
-          REDIS_PASSWORD: ${{ secrets.CI_REDIS_PASSWORD }}
-
-        run: php artisan test
+        run: php artisan test --coverage
 
   # ============================================================
-  # 2. LINT
-  # ============================================================
-
-  lint:
-    name: Check (Lint)
-
-    needs: test
 
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
 
     steps:
       # --------------------------------------------------------
@@ -429,11 +419,6 @@ jobs:
           tags: |
             ghcr.io/sopheaklaing/devops-task-api:${{ github.sha }}
             ghcr.io/sopheaklaing/devops-task-api:latest
-
-      # --------------------------------------------------------
-      # Production Tag
-      # --------------------------------------------------------
-
       - name: Tag production image
         if: github.ref == 'refs/heads/main'
         run: |
@@ -448,7 +433,6 @@ jobs:
   # ============================================================
   # 5. QUALITY GATE
   # ============================================================
-
   quality-gate:
     name: Quality Gate
 
@@ -478,7 +462,6 @@ jobs:
   # ============================================================
   # 6. IMAGE INFORMATION
   # ============================================================
-
   image-info:
     name: Docker Image
 
