@@ -16,31 +16,24 @@ services:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_healthy
+        condition: service_started
 
     environment:
-      APP_ENV: ${APP_ENV:-local}
-      APP_DEBUG: ${APP_DEBUG:-false}
+      APP_ENV: local
+      APP_DEBUG: "true"
 
       DB_CONNECTION: pgsql
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_DATABASE: ${DB_DATABASE}
-      DB_USERNAME: ${DB_USERNAME}
-      DB_PASSWORD: ${DB_PASSWORD}
+      DB_DATABASE: devops_task
+      DB_USERNAME: postgres
+      DB_PASSWORD: secret
 
-      REDIS_CLIENT: phpredis
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD}
 
     networks:
       - devops-network
-
-    restart: unless-stopped
-
-    security_opt:
-      - no-new-privileges:true
 
   postgres:
     image: postgres:17
@@ -48,9 +41,9 @@ services:
     container_name: devops-postgres
 
     environment:
-      POSTGRES_DB: ${DB_DATABASE}
-      POSTGRES_USER: ${DB_USERNAME}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: devops_task
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
 
     ports:
       - "5433:5432"
@@ -59,60 +52,27 @@ services:
       - postgres-data:/var/lib/postgresql/data
 
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"
-        ]
+      test: ["CMD-SHELL", "pg_isready -U postgres -d devops_task"]
       interval: 5s
       timeout: 5s
       retries: 5
-      start_period: 10s
 
     networks:
       - devops-network
-
-    restart: unless-stopped
-
-    security_opt:
-      - no-new-privileges:true
 
   redis:
     image: redis:7-alpine
 
     container_name: devops-redis
 
-    command:
-      - redis-server
-      - --requirepass
-      - ${REDIS_PASSWORD}
-      - --appendonly
-      - "yes"
+    ports:
+      - "6379:6379"
 
     volumes:
       - redis-data:/data
 
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "redis-cli",
-          "-a",
-          "${REDIS_PASSWORD}",
-          "ping"
-        ]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
-
     networks:
       - devops-network
-
-    restart: unless-stopped
-
-    security_opt:
-      - no-new-privileges:true
 
 networks:
   devops-network:
