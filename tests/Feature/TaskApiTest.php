@@ -6,7 +6,6 @@ use App\Models\Task;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
-
 use Tests\TestCase;
 
 class TaskApiTest extends TestCase
@@ -85,7 +84,6 @@ class TaskApiTest extends TestCase
         $response = $this
             ->withHeaders($this->authHeaders())
             ->getJson('/api/tasks/'.$task->id);
-
 
         $response->assertStatus(200);
 
