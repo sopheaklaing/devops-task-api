@@ -9,6 +9,24 @@ use Illuminate\Http\Response;
 
 class TaskController extends Controller
 {
+    /**
+     * Get authenticated user's tasks.
+     */
+    public function index(): JsonResponse
+    {
+        $user = auth('api')->user();
+
+        $tasks = $user->tasks()
+            ->latest()
+            ->get();
+
+        return response()->json($tasks);
+    }
+
+    /**
+     * Create task for authenticated user.
+     */
+    public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
             'title' => [
@@ -29,6 +47,18 @@ class TaskController extends Controller
 
         return response()->json($task, 201);
     }
+
+    /**
+     * Get one task.
+     */
+    public function show(Task $task): JsonResponse
+    {
+        $user = auth('api')->user();
+
+        abort_unless(
+            $task->user_id === $user->id,
+            403
+        );
 
         return response()->json($task);
     }
@@ -64,6 +94,20 @@ class TaskController extends Controller
 
         return response()->json($task);
     }
+
+    /**
+     * Delete task.
+     */
+    public function destroy(Task $task): Response
+    {
+        $user = auth('api')->user();
+
+        abort_unless(
+            $task->user_id === $user->id,
+            403
+        );
+
+        $task->delete();
 
         return response()->noContent();
     }
