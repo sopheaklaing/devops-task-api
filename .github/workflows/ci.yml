@@ -12,7 +12,6 @@ on:
       - main
       - develop
 
-
 permissions:
   contents: read
 
@@ -22,20 +21,18 @@ jobs:
   # ============================================================
   test:
     name: Test
+
     runs-on: ubuntu-latest
 
     services:
       postgres:
         image: postgres:17
-
         env:
           POSTGRES_DB: devops_task_test
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
-
         ports:
           - 5432:5432
-
         options: >-
           --health-cmd="pg_isready -U postgres -d devops_task_test"
           --health-interval=10s
@@ -44,30 +41,17 @@ jobs:
 
       redis:
         image: redis:7-alpine
-
-        env:
-          REDIS_PASSWORD: ${{ secrets.CI_REDIS_PASSWORD }}
-
         ports:
           - 6379:6379
-
         options: >-
-          --health-cmd="redis-cli -a $REDIS_PASSWORD ping"
+          --health-cmd="redis-cli ping"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
 
     steps:
-      # --------------------------------------------------------
-      # Checkout
-      # --------------------------------------------------------
-
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # --------------------------------------------------------
-      # PHP
-      # --------------------------------------------------------
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -76,119 +60,64 @@ jobs:
           extensions: pdo, pdo_pgsql
           coverage: none
 
-      # --------------------------------------------------------
-      # Environment
-      # --------------------------------------------------------
-
       - name: Copy environment file
         run: cp .env.example .env
-
-      # --------------------------------------------------------
-      # Composer
-      # --------------------------------------------------------
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-      # --------------------------------------------------------
-      # PostgreSQL Connection Check
-      # --------------------------------------------------------
-
-      - name: Check PostgreSQL connection
+      - name: Generate application key
         env:
+          APP_KEY: ${{ secrets.CI_APP_KEY }}
+        run: php artisan key:generate --force
+
+      - name: Generate JWT secret
+        env:
+          JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+        run: php artisan jwt:secret --force
+
+      - name: Run migrations
+        env:
+          APP_KEY: ${{ secrets.CI_APP_KEY }}
+          JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           DB_DATABASE: devops_task_test
           DB_USERNAME: postgres
           DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
-        run: |
-          php -r '
-          $maxAttempts = 30;
-
-          for ($i = 1; $i <= $maxAttempts; $i++) {
-              try {
-                  new PDO(
-                      "pgsql:host=127.0.0.1;port=5432;dbname=devops_task_test",
-                      "postgres",
-                      getenv("DB_PASSWORD")
-                  );
-
-                  echo "PostgreSQL is ready!" . PHP_EOL;
-                  exit(0);
-              } catch (PDOException $e) {
-                  echo "Waiting for PostgreSQL... ($i/$maxAttempts)" . PHP_EOL;
-                  sleep(2);
-              }
-          }
-
-          echo "PostgreSQL failed to become ready." . PHP_EOL;
-          exit(1);
-          '
-
-      # --------------------------------------------------------
-      # Run Migrations
-      # --------------------------------------------------------
-
-      - name: Check PostgreSQL connection
-        env:
-          APP_KEY: ${{ secrets.CI_APP_KEY }}
-          JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
-
-          DB_CONNECTION: pgsql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 5432
-          DB_DATABASE: devops_task_test
-          DB_USERNAME: postgres
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
         run: php artisan migrate --force
-
-      # --------------------------------------------------------
-      # Tests
-      # --------------------------------------------------------
 
       - name: Run tests
         env:
           APP_KEY: ${{ secrets.CI_APP_KEY }}
           JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
           JWT_ALGO: HS256
-
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           DB_DATABASE: devops_task_test
           DB_USERNAME: postgres
-
-      - name: Run tests with coverage
-        env:
-          DB_CONNECTION: pgsql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 5432
-          DB_DATABASE: devops_task_test
-          DB_USERNAME: postgres
-          DB_PASSWORD: secret
+          DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
-        run: php artisan test --coverage
+        run: php artisan test
 
   # ============================================================
+  # 2. LINT
+  # ============================================================
+  lint:
+    name: Lint
+
+    needs: test
 
     runs-on: ubuntu-latest
 
-    permissions:
-      contents: read
-      packages: write
-
     steps:
-      # --------------------------------------------------------
-      # Checkout
-      # --------------------------------------------------------
-
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # --------------------------------------------------------
-      # PHP
-      # --------------------------------------------------------
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
@@ -196,16 +125,8 @@ jobs:
           php-version: "8.4"
           coverage: none
 
-      # --------------------------------------------------------
-      # Composer
-      # --------------------------------------------------------
-
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
-
-      # --------------------------------------------------------
-      # Laravel Pint
-      # --------------------------------------------------------
 
       - name: Run Laravel Pint
         run: vendor/bin/pint --test
@@ -213,9 +134,8 @@ jobs:
   # ============================================================
   # 3. COVERAGE
   # ============================================================
-
   coverage:
-    name: Check (Coverage)
+    name: Coverage
 
     needs: test
 
@@ -224,15 +144,12 @@ jobs:
     services:
       postgres:
         image: postgres:17
-
         env:
           POSTGRES_DB: devops_task_test
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
-
         ports:
           - 5432:5432
-
         options: >-
           --health-cmd="pg_isready -U postgres -d devops_task_test"
           --health-interval=10s
@@ -241,30 +158,17 @@ jobs:
 
       redis:
         image: redis:7-alpine
-
-        env:
-          REDIS_PASSWORD: ${{ secrets.CI_REDIS_PASSWORD }}
-
         ports:
           - 6379:6379
-
         options: >-
-          --health-cmd="redis-cli -a $REDIS_PASSWORD ping"
+          --health-cmd="redis-cli ping"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
 
     steps:
-      # --------------------------------------------------------
-      # Checkout
-      # --------------------------------------------------------
-
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # --------------------------------------------------------
-      # PHP + Xdebug
-      # --------------------------------------------------------
 
       - name: Setup PHP with Xdebug
         uses: shivammathur/setup-php@v2
@@ -273,107 +177,54 @@ jobs:
           extensions: pdo, pdo_pgsql
           coverage: xdebug
 
-      # --------------------------------------------------------
-      # Environment
-      # --------------------------------------------------------
-
       - name: Copy environment file
         run: cp .env.example .env
-
-      # --------------------------------------------------------
-      # Composer
-      # --------------------------------------------------------
 
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-      # --------------------------------------------------------
-      # PostgreSQL Connection Check
-      # --------------------------------------------------------
-
-      - name: Check PostgreSQL connection
+      - name: Generate application key
         env:
-          DB_CONNECTION: pgsql
-          DB_HOST: 127.0.0.1
-          DB_PORT: 5432
-          DB_DATABASE: devops_task_test
-          DB_USERNAME: postgres
-          DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
-        run: |
-          php -r '
-          $maxAttempts = 30;
+          APP_KEY: ${{ secrets.CI_APP_KEY }}
+        run: php artisan key:generate --force
 
-          for ($i = 1; $i <= $maxAttempts; $i++) {
-              try {
-                  new PDO(
-                      "pgsql:host=127.0.0.1;port=5432;dbname=devops_task_test",
-                      "postgres",
-                      getenv("DB_PASSWORD")
-                  );
-
-                  echo "PostgreSQL is ready!" . PHP_EOL;
-                  exit(0);
-              } catch (PDOException $e) {
-                  echo "Waiting for PostgreSQL... ($i/$maxAttempts)" . PHP_EOL;
-                  sleep(2);
-              }
-          }
-
-          echo "PostgreSQL failed to become ready." . PHP_EOL;
-          exit(1);
-          '
-
-      # --------------------------------------------------------
-      # Run Migrations
-      # --------------------------------------------------------
+      - name: Generate JWT secret
+        env:
+          JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
+        run: php artisan jwt:secret --force
 
       - name: Run migrations
         env:
           APP_KEY: ${{ secrets.CI_APP_KEY }}
           JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
-
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           DB_DATABASE: devops_task_test
           DB_USERNAME: postgres
           DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
-
-          REDIS_CLIENT: phpredis
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
-          REDIS_PASSWORD: ${{ secrets.CI_REDIS_PASSWORD }}
-
         run: php artisan migrate --force
-
-      # --------------------------------------------------------
-      # Coverage
-      # --------------------------------------------------------
 
       - name: Run tests with coverage
         env:
           APP_KEY: ${{ secrets.CI_APP_KEY }}
           JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
           JWT_ALGO: HS256
-
           DB_CONNECTION: pgsql
           DB_HOST: 127.0.0.1
           DB_PORT: 5432
           DB_DATABASE: devops_task_test
           DB_USERNAME: postgres
           DB_PASSWORD: ${{ secrets.CI_DB_PASSWORD }}
-
-          REDIS_CLIENT: phpredis
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
-          REDIS_PASSWORD: ${{ secrets.CI_REDIS_PASSWORD }}
-
         run: php artisan test --coverage
 
   # ============================================================
   # 4. DOCKER BUILD & PUSH
   # ============================================================
-
   build-and-push:
     name: Docker Build & Push
 
@@ -389,16 +240,8 @@ jobs:
       packages: write
 
     steps:
-      # --------------------------------------------------------
-      # Checkout
-      # --------------------------------------------------------
-
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      # --------------------------------------------------------
-      # Login to GHCR
-      # --------------------------------------------------------
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -406,10 +249,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      # --------------------------------------------------------
-      # Build & Push
-      # --------------------------------------------------------
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -419,6 +258,7 @@ jobs:
           tags: |
             ghcr.io/sopheaklaing/devops-task-api:${{ github.sha }}
             ghcr.io/sopheaklaing/devops-task-api:latest
+
       - name: Tag production image
         if: github.ref == 'refs/heads/main'
         run: |
