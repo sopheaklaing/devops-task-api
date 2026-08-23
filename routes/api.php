@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\TaskController;
 use App\Http\Controllers\api\AuthController;
+use App\Http\Controllers\TaskController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/test', function () {

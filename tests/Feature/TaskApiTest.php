@@ -33,7 +33,7 @@ class TaskApiTest extends TestCase
     private function authHeaders(): array
     {
         return [
-            'Authorization' => 'Bearer ' . $this->token,
+            'Authorization' => 'Bearer '.$this->token,
             'Accept' => 'application/json',
         ];
     }
@@ -84,7 +84,7 @@ class TaskApiTest extends TestCase
 
         $response = $this
             ->withHeaders($this->authHeaders())
-            ->getJson('/api/tasks/' . $task->id);
+            ->getJson('/api/tasks/'.$task->id);
 
         $response->assertStatus(200);
 
@@ -109,7 +109,7 @@ class TaskApiTest extends TestCase
 
         $response = $this
             ->withHeaders($this->authHeaders())
-            ->putJson('/api/tasks/' . $task->id, [
+            ->putJson('/api/tasks/'.$task->id, [
                 'title' => 'Learn Docker CI/CD',
                 'description' => 'Learn Docker, Compose and GitHub Actions',
             ]);
@@ -137,7 +137,7 @@ class TaskApiTest extends TestCase
 
         $response = $this
             ->withHeaders($this->authHeaders())
-            ->deleteJson('/api/tasks/' . $task->id);
+            ->deleteJson('/api/tasks/'.$task->id);
 
         $response->assertStatus(204);
 
