@@ -4,20 +4,19 @@ namespace App\Http\Controllers\api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rules\Password;
 use PHPOpenSourceSaver\JWTAuth\Facades\JWTAuth;
-use Illuminate\Foundation\Configuration\Exceptions;
-use Illuminate\Foundation\Configuration\Middleware;
+
 class AuthController extends Controller
 {
-    // =========================
-    // REGISTER
-    // =========================
-    public function register(Request $request)
+    /**
+     * Register user.
+     */
+    public function register(Request $request): JsonResponse
     {
-        // 1. Validate request
         $validated = $request->validate([
             'name' => [
                 'required',
@@ -43,16 +42,15 @@ class AuthController extends Controller
             ],
         ]);
 
-        // 2. Create user
         $user = User::create([
             'name' => $validated['name'],
             'email' => strtolower($validated['email']),
             'password' => Hash::make($validated['password']),
         ]);
 
-        // 3. Return response
         return response()->json([
             'message' => 'User registered successfully',
+
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
@@ -62,12 +60,11 @@ class AuthController extends Controller
         ], 201);
     }
 
-    // =========================
-    // LOGIN
-    // =========================
-    public function login(Request $request)
+    /**
+     * Login user.
+     */
+    public function login(Request $request): JsonResponse
     {
-        // 1. Validate request
         $validated = $request->validate([
             'email' => [
                 'required',
@@ -80,13 +77,11 @@ class AuthController extends Controller
             ],
         ]);
 
-        // 2. Find user
         $user = User::where(
             'email',
             strtolower($validated['email'])
         )->first();
 
-        // 3. Check email + password
         if (
             ! $user ||
             ! Hash::check(
@@ -99,26 +94,25 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // 4. Generate JWT token
         $token = JWTAuth::fromUser($user);
 
-        // 5. Return token
         return response()->json([
             'message' => 'Login successful',
             'token' => $token,
             'token_type' => 'Bearer',
+
             'user' => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
             ],
-        ], 200);
+        ]);
     }
 
-    // =========================
-    // ME
-    // =========================
-    public function me()
+    /**
+     * Get authenticated user.
+     */
+    public function me(): JsonResponse
     {
         try {
             $user = JWTAuth::parseToken()->authenticate();
@@ -129,19 +123,18 @@ class AuthController extends Controller
                     'name' => $user->name,
                     'email' => $user->email,
                 ],
-            ], 200);
-
-        } catch (\Exception $e) {
+            ]);
+        } catch (\Throwable $e) {
             return response()->json([
                 'message' => 'Unauthorized',
             ], 401);
         }
     }
 
-    // =========================
-    // LOGOUT
-    // =========================
-    public function logout()
+    /**
+     * Logout user.
+     */
+    public function logout(): JsonResponse
     {
         try {
             $token = JWTAuth::getToken();
@@ -156,9 +149,8 @@ class AuthController extends Controller
 
             return response()->json([
                 'message' => 'Logout successful',
-            ], 200);
-
-        } catch (\Exception $e) {
+            ]);
+        } catch (\Throwable $e) {
             return response()->json([
                 'message' => 'Logout failed',
             ], 500);
