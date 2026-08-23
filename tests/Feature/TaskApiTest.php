@@ -12,25 +12,35 @@ class TaskApiTest extends TestCase
 {
     use RefreshDatabase;
 
+    private User $user;
+
     private string $token;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $user = User::factory()->create();
+        // Create authenticated user
+        $this->user = User::factory()->create();
 
-        $this->token = JWTAuth::fromUser($user);
+        // Create JWT token for the user
+        $this->token = JWTAuth::fromUser($this->user);
     }
 
+    /**
+     * Get authentication headers.
+     */
     private function authHeaders(): array
     {
         return [
-            'Authorization' => 'Bearer '.$this->token,
+            'Authorization' => 'Bearer ' . $this->token,
             'Accept' => 'application/json',
         ];
     }
 
+    /**
+     * Test: authenticated user can get tasks.
+     */
     public function test_can_get_tasks(): void
     {
         $response = $this
@@ -40,6 +50,9 @@ class TaskApiTest extends TestCase
         $response->assertStatus(200);
     }
 
+    /**
+     * Test: authenticated user can create a task.
+     */
     public function test_can_create_task(): void
     {
         $response = $this
@@ -52,41 +65,51 @@ class TaskApiTest extends TestCase
         $response->assertStatus(201);
 
         $this->assertDatabaseHas('tasks', [
+            'user_id' => $this->user->id,
             'title' => 'Learn Docker',
             'description' => 'Learn Docker Compose and CI/CD',
         ]);
     }
 
+    /**
+     * Test: authenticated user can get a single task.
+     */
     public function test_can_get_single_task(): void
     {
         $task = Task::create([
+            'user_id' => $this->user->id,
             'title' => 'Learn Docker',
             'description' => 'Learn Docker Compose and CI/CD',
         ]);
 
         $response = $this
             ->withHeaders($this->authHeaders())
-            ->getJson('/api/tasks/'.$task->id);
+            ->getJson('/api/tasks/' . $task->id);
 
         $response->assertStatus(200);
 
         $response->assertJson([
             'id' => $task->id,
+            'user_id' => $this->user->id,
             'title' => 'Learn Docker',
             'description' => 'Learn Docker Compose and CI/CD',
         ]);
     }
 
+    /**
+     * Test: authenticated user can update their task.
+     */
     public function test_can_update_task(): void
     {
         $task = Task::create([
+            'user_id' => $this->user->id,
             'title' => 'Learn Docker',
             'description' => 'Learn Docker Compose',
         ]);
 
         $response = $this
             ->withHeaders($this->authHeaders())
-            ->putJson('/api/tasks/'.$task->id, [
+            ->putJson('/api/tasks/' . $task->id, [
                 'title' => 'Learn Docker CI/CD',
                 'description' => 'Learn Docker, Compose and GitHub Actions',
             ]);
@@ -95,21 +118,26 @@ class TaskApiTest extends TestCase
 
         $this->assertDatabaseHas('tasks', [
             'id' => $task->id,
+            'user_id' => $this->user->id,
             'title' => 'Learn Docker CI/CD',
             'description' => 'Learn Docker, Compose and GitHub Actions',
         ]);
     }
 
+    /**
+     * Test: authenticated user can delete their task.
+     */
     public function test_can_delete_task(): void
     {
         $task = Task::create([
+            'user_id' => $this->user->id,
             'title' => 'Learn Docker',
             'description' => 'Learn Docker Compose',
         ]);
 
         $response = $this
             ->withHeaders($this->authHeaders())
-            ->deleteJson('/api/tasks/'.$task->id);
+            ->deleteJson('/api/tasks/' . $task->id);
 
         $response->assertStatus(204);
 
