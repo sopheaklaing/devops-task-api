@@ -5,43 +5,65 @@ namespace App\Http\Controllers;
 use App\Models\Task;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class TaskController extends Controller
 {
-    public function index(): JsonResponse
     {
-        return response()->json(Task::all());
-    }
+        $validated = $request->validate([
+            'title' => [
+                'required',
+                'string',
+                'max:255',
+            ],
 
-    public function store(Request $request)
-    {
-        $task = Task::create([
-            'title' => $request->title,
-            'description' => $request->description,
+            'description' => [
+                'nullable',
+                'string',
+            ],
         ]);
+
+        $user = auth('api')->user();
+
+        $task = $user->tasks()->create($validated);
 
         return response()->json($task, 201);
     }
 
-    public function show(Task $task)
-    {
-
         return response()->json($task);
     }
 
-    public function update(Request $request, Task $task)
-    {
-        $task->update([
-            'title' => $request->title,
-            'description' => $request->description,
+    /**
+     * Update task.
+     */
+    public function update(
+        Request $request,
+        Task $task
+    ): JsonResponse {
+        $user = auth('api')->user();
+
+        abort_unless(
+            $task->user_id === $user->id,
+            403
+        );
+
+        $validated = $request->validate([
+            'title' => [
+                'required',
+                'string',
+                'max:255',
+            ],
+
+            'description' => [
+                'nullable',
+                'string',
+            ],
         ]);
 
+        $task->update($validated);
+
         return response()->json($task);
     }
-
-    public function destroy(Task $task)
-    {
-        $task->delete();
 
         return response()->noContent();
     }
