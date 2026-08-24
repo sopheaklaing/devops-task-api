@@ -269,10 +269,12 @@ git status
 git add .
 
 # 5. Commit
-git commit -m "feat: your fix"
+git commit -m "feat: your fix api"
 
 # 6. Push
 git push origin develop
 ```
 
 After that, GitHub Actions will automatically continue: CI Test → Docker Build → GHCR → Deploy Production.
+
+test for do with team 
