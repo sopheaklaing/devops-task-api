@@ -109,7 +109,7 @@ jobs:
   # 2. LINT
   # ============================================================
   lint:
-    name: Lint
+    name: Code Formatting
 
     needs: test
 
@@ -128,8 +128,8 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
-      - name: Run Laravel Pint
-        run: vendor/bin/pint --test
+      - name: Check code formatting
+        run: php vendor/bin/pint --test
 
   # ============================================================
   # 3. COVERAGE
