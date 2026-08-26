@@ -142,4 +142,39 @@ class TaskApiTest extends TestCase
             'id' => $task->id,
         ]);
     }
+
+    public function test_unauthenticated_user_cannot_get_tasks(): void
+    {
+        $response = $this->getJson('/api/tasks');
+
+        $response->assertStatus(401);
+    }
+
+    public function test_cannot_create_task_without_title(): void
+    {
+        $response = $this
+            ->withHeaders($this->authHeaders())
+            ->postJson('/api/tasks', [
+                'description' => 'Learn Docker',
+            ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_user_cannot_view_another_users_task(): void
+    {
+        $anotherUser = User::factory()->create();
+
+        $task = Task::create([
+            'user_id' => $anotherUser->id,
+            'title' => 'Private Task',
+            'description' => 'Private',
+        ]);
+
+        $response = $this
+            ->withHeaders($this->authHeaders())
+            ->getJson('/api/tasks/'.$task->id);
+
+        $response->assertStatus(403);
+    }
 }
