@@ -40,6 +40,7 @@ jobs:
         shell: powershell
         env:
           IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
+          JWT_SECRET: ${{ secrets.CI_JWT_SECRET }}
         run: |
           docker compose -f compose.prod.yaml up -d
       # 5. Run database migrations
