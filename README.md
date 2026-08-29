@@ -277,4 +277,6 @@ git push origin develop
 
 After that, GitHub Actions will automatically continue: CI Test → Docker Build → GHCR → Deploy Production.
 
-test for do with team 
+
+- **GitHub Repository:** https://github.com/sopheaklaing/cicd-express-demo
+- **Live Project:** https://my-cicd-project.vercel.app
